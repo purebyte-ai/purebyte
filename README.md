@@ -17,8 +17,8 @@
   <a href="https://github.com/purebyte-ai/purebyte/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/purebyte-ai/purebyte/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/purebyte-ai/purebyte/releases"><img alt="Release" src="https://img.shields.io/github/v/release/purebyte-ai/purebyte?color=C6F16B&labelColor=0D0F13"></a>
   <a href="https://pypi.org/project/purebyte/"><img alt="PyPI" src="https://img.shields.io/pypi/v/purebyte?color=C6F16B&labelColor=0D0F13"></a>
-  <a href="https://hub.docker.com/r/purebyte/purebyte"><img alt="Docker" src="https://img.shields.io/badge/docker-purebyte-2496ED?logo=docker&logoColor=white&labelColor=0D0F13"></a>
-  <a href="https://doi.org/10.5281/zenodo.23020056"><img alt="DOI" src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23020056-5EEAD4?labelColor=0D0F13"></a>
+  <a href="https://github.com/orgs/purebyte-ai/packages/container/package/purebyte"><img alt="Docker" src="https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker&logoColor=white&labelColor=0D0F13"></a>
+  <a href="https://zenodo.org/records/23020056"><img alt="DOI" src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23020056-5EEAD4?labelColor=0D0F13"></a>
   <a href="https://huggingface.co/purebyte"><img alt="Hugging Face mirror" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-purebyte%20mirror-5EEAD4?labelColor=0D0F13"></a>
   <a href="benchmarks/RESULTS.md"><img alt="Benchmarks, with their conditions" src="https://img.shields.io/badge/benchmarks-with%20their%20conditions-C6F16B?labelColor=0D0F13"></a>
   <a href="LICENSE"><img alt="Code license: Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-C6F16B?labelColor=0D0F13"></a>
@@ -1004,12 +1004,12 @@ More answers, including confidence, votes and operating points: [docs/faq.md](do
 | Where | Link |
 |---|---|
 | Website | [purebyte.ai](https://purebyte.ai) |
-| Research paper | [PureByte: SLMs Are the Future](https://doi.org/10.5281/zenodo.23020056) (Zenodo) |
+| Research paper | [PureByte: SLMs Are the Future](https://zenodo.org/records/23020056) (Zenodo · DOI: 10.5281/zenodo.23020056) |
 | Code, issues, discussions | [github.com/purebyte-ai](https://github.com/purebyte-ai) |
 | Training stack | [github.com/purebyte-ai/purebyte-train](https://github.com/purebyte-ai/purebyte-train) |
 | Models | The releases of this repository ([catalog](models/README.md)); mirror: [huggingface.co/purebyte](https://huggingface.co/purebyte) |
 | Python package | [pypi.org/project/purebyte](https://pypi.org/project/purebyte/) |
-| Container image | [ghcr.io/purebyte-ai/purebyte](https://github.com/purebyte-ai/purebyte/pkgs/container/purebyte) · [Docker Hub](https://hub.docker.com/r/purebyte/purebyte) |
+| Container image | [ghcr.io/purebyte-ai/purebyte](https://github.com/orgs/purebyte-ai/packages/container/package/purebyte) |
 | X | [@purebyteai](https://x.com/purebyteai) |
 | YouTube | [@purebyteai](https://www.youtube.com/@purebyteai) |
 | Instagram | [@purebyte.ai](https://www.instagram.com/purebyte.ai/) |
@@ -1046,7 +1046,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Found a vulnerability? 
 
 PureByte was created and built by **Pablo Sirvent Jiménez**:
 
-- **Websites:** [sirvent.ai](https://sirvent.ai) · [pablosirvent.com](https://pablosirvent.com)
+- **Websites:** [sirvent.ai](https://sirvent.ai) · [pablosirvent.com](https://www.pablosirvent.com)
 - **GitHub:** [@sirventai](https://github.com/sirventai)
 - **X / Twitter:** [@sirventai](https://x.com/sirventai)
 - **Blog:** [sirventai.medium.com](https://sirventai.medium.com)
