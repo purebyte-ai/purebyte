@@ -5,6 +5,7 @@
 
 #include "args.h"
 #include "catalog.h"
+#include "inputs.h"
 
 namespace cli {
 
@@ -97,9 +98,9 @@ void Exclusions::load(const std::string& file) {
     // Read as every other file is (pb::read_file): a UTF-8 path, which the narrow streams of Windows cannot open
     // outside the ANSI code page. The file comes with the repository scanned: a link is not followed.
     const std::filesystem::path path = std::filesystem::u8path(file);
-    std::error_code ec;
-    if (std::filesystem::is_symlink(std::filesystem::symlink_status(path, ec)))
+    if (is_link(path))
         throw UsageError("the exclusion file " + display_path(file) + " is a symbolic link, which is not followed", 2);
+    std::error_code ec;
     if (!std::filesystem::exists(path, ec)) return;
     const std::vector<uint8_t> bytes = read_whole_file(file, "the exclusion file");
     std::string text(bytes.begin(), bytes.end());

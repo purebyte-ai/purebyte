@@ -86,26 +86,6 @@ bool outside_project(const fs::path& path) {
     return !normal.empty() && *normal.begin() == "..";
 }
 
-// A link, never followed by a walk or a diff: a symbolic link, or on Windows any reparse point that stands for another
-// file or folder (a junction, a symbolic link, a WSL link: the "name surrogate" tags). std::filesystem does not report
-// junctions as links, and one that points to a folder above it would make a walk endless. Other reparse points, such
-// as the placeholders of files kept in the cloud, are ordinary files and folders.
-bool is_link(const fs::path& path) {
-    std::error_code e;
-    if (fs::is_symlink(fs::symlink_status(path, e))) return true;
-#ifdef _WIN32
-    const DWORD attributes = GetFileAttributesW(path.c_str());
-    if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_REPARSE_POINT)) return false;
-    WIN32_FIND_DATAW data;
-    const HANDLE found = FindFirstFileW(path.c_str(), &data);
-    if (found == INVALID_HANDLE_VALUE) return true;  // a reparse point that cannot be identified: not followed
-    FindClose(found);
-    return IsReparseTagNameSurrogate(data.dwReserved0);
-#else
-    return false;
-#endif
-}
-
 // A directory walk, top-down, entering neither links (symbolic links, and junctions on Windows) nor the directories the
 // profile skips or the user excludes. `rule` is the directory's own path for the path rules ("" at the top of an
 // argument outside the project); `top` is its path from the top of the walk, which exclusion patterns match.
@@ -303,6 +283,22 @@ InputPlan plan_git(const std::vector<std::string>& diff_args, const std::string&
 }
 
 }  // namespace
+
+bool is_link(const fs::path& path) {
+    std::error_code e;
+    if (fs::is_symlink(fs::symlink_status(path, e))) return true;
+#ifdef _WIN32
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_REPARSE_POINT)) return false;
+    WIN32_FIND_DATAW data;
+    const HANDLE found = FindFirstFileW(path.c_str(), &data);
+    if (found == INVALID_HANDLE_VALUE) return true;  // a reparse point that cannot be identified: not followed
+    FindClose(found);
+    return IsReparseTagNameSurrogate(data.dwReserved0);
+#else
+    return false;
+#endif
+}
 
 bool AddedLines::contains(int64_t first, int64_t last) const {
     if (all) return true;

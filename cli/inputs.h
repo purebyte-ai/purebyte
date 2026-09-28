@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
@@ -63,5 +64,9 @@ InputPlan plan_git_diff(const std::string& ref, const std::string& path, const p
 // One input read from a file or standard input ("-"), for the commands that take a single input. `model_limit` says
 // whose limit `limit` is in the message of an input over it: the model's, or the command's own.
 std::vector<uint8_t> read_one(const std::string& path, uint64_t limit, bool model_limit = true);
+
+// A link, never followed by a walk or a diff: a symbolic link, or on Windows any reparse point that stands for another
+// file or folder (a junction, a symbolic link, a WSL link: the "name surrogate" tags).
+bool is_link(const std::filesystem::path& path);
 
 }  // namespace cli
