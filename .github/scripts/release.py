@@ -401,7 +401,7 @@ def test_wheel(wheel: str, version: str | None) -> None:
                 "print(purebyte.version())"
         lines = run([python, "-c", probe], cwd=temp, env=env, capture_output=True, text=True).stdout.split()
         package_dir, module_version, library_version = lines[0], lines[1], lines[2]
-        if not os.path.abspath(package_dir).startswith(os.path.abspath(environment)):
+        if not os.path.realpath(package_dir).startswith(os.path.realpath(environment)):
             raise ReleaseError(f"the test imported purebyte from {package_dir}, not from the wheel")
         if (module_version, library_version) != (version, version):
             raise ReleaseError(f"purebyte.__version__ is {module_version} and purebyte.version() {library_version}, "
