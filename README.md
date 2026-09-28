@@ -18,6 +18,7 @@
   <a href="https://github.com/purebyte-ai/purebyte/releases"><img alt="Release" src="https://img.shields.io/github/v/release/purebyte-ai/purebyte?color=C6F16B&labelColor=0D0F13"></a>
   <a href="https://pypi.org/project/purebyte/"><img alt="PyPI" src="https://img.shields.io/pypi/v/purebyte?color=C6F16B&labelColor=0D0F13"></a>
   <a href="https://hub.docker.com/r/purebyte/purebyte"><img alt="Docker" src="https://img.shields.io/badge/docker-purebyte-2496ED?logo=docker&logoColor=white&labelColor=0D0F13"></a>
+  <a href="https://doi.org/10.5281/zenodo.23020056"><img alt="DOI" src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23020056-5EEAD4?labelColor=0D0F13"></a>
   <a href="https://huggingface.co/purebyte"><img alt="Hugging Face mirror" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-purebyte%20mirror-5EEAD4?labelColor=0D0F13"></a>
   <a href="benchmarks/RESULTS.md"><img alt="Benchmarks, with their conditions" src="https://img.shields.io/badge/benchmarks-with%20their%20conditions-C6F16B?labelColor=0D0F13"></a>
   <a href="LICENSE"><img alt="Code license: Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-C6F16B?labelColor=0D0F13"></a>
@@ -1003,6 +1004,7 @@ More answers, including confidence, votes and operating points: [docs/faq.md](do
 | Where | Link |
 |---|---|
 | Website | [purebyte.ai](https://purebyte.ai) |
+| Research paper | [PureByte: SLMs Are the Future](https://doi.org/10.5281/zenodo.23020056) (Zenodo) |
 | Code, issues, discussions | [github.com/purebyte-ai](https://github.com/purebyte-ai) |
 | Training stack | [github.com/purebyte-ai/purebyte-train](https://github.com/purebyte-ai/purebyte-train) |
 | Models | The releases of this repository ([catalog](models/README.md)); mirror: [huggingface.co/purebyte](https://huggingface.co/purebyte) |
@@ -1052,11 +1054,19 @@ PureByte was created and built by **Pablo Sirvent Jiménez**:
 
 ## Citation
 
-If PureByte helps your research, please cite it ([CITATION.cff](CITATION.cff)):
+If PureByte or the paper helps your research, please cite:
 
 ```bibtex
+@article{purebyte2026paper,
+  title   = {PureByte: SLMs Are the Future},
+  author  = {Sirvent Jiménez, Pablo},
+  year    = {2026},
+  doi     = {10.5281/zenodo.23020056},
+  url     = {https://doi.org/10.5281/zenodo.23020056}
+}
+
 @software{purebyte,
-  title  = {PureByte: an open runtime for tiny byte-level AI Specialists},
+  title   = {PureByte: an open runtime for tiny byte-level AI Specialists},
   author  = {Sirvent Jiménez, Pablo},
   version = {1.0.0},
   year    = {2026},

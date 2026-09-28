@@ -10,6 +10,20 @@ repository-code: "https://github.com/purebyte-ai/purebyte"
 license: Apache-2.0
 version: 1.0.0
 date-released: 2026-09-28
+doi: "10.5281/zenodo.23020056"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23020056"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Sirvent Jiménez"
+      given-names: "Pablo"
+      email: "pablo@purebyte.ai"
+  title: "PureByte: SLMs Are the Future"
+  year: 2026
+  doi: "10.5281/zenodo.23020056"
+  url: "https://doi.org/10.5281/zenodo.23020056"
 abstract: >-
   PureByte is an architecture and an open runtime for AI Specialists: tiny
   models that read raw bytes and answer with decisions, scores and byte spans instead of
