@@ -7,6 +7,8 @@ All notable changes to the PureByte runtime are recorded here. The format follow
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-28
+
 First public release. The training stack that makes the AI Specialists lives in its own repository,
 with its own changelog: [purebyte-ai/purebyte-train](https://github.com/purebyte-ai/purebyte-train).
 

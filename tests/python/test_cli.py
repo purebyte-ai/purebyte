@@ -305,6 +305,14 @@ def make_symlink(link, target):
         os.symlink(target, link, target_is_directory=os.path.isdir(target))
     except (OSError, NotImplementedError):
         return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(str(link))
+            if attrs == -1 or not (attrs & 0x400):
+                return False
+        except Exception:
+            pass
     return os.path.islink(link)
 
 
