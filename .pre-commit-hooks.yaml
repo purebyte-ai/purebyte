@@ -1,0 +1,16 @@
+# pre-commit hook published by this repository (https://pre-commit.com). Documentation: integrations/pre-commit/.
+#
+# It runs the `purebyte` CLI installed on the machine (a release binary or `pip install purebyte`) on the staged
+# changes and reports only findings on added lines. Nothing leaves the machine. The commit is stopped only by findings
+# of severity error: findings in test, example and documentation paths are warnings (`args: [--strict]` to stop on
+# them too). It checks commits only: `pre-commit run --all-files` has nothing staged and scans nothing (to scan a
+# whole repository, run `purebyte scan .`, or use the GitHub Action or the GitLab CI job).
+
+- id: purebyte
+  name: PureByte secrets scan
+  description: Find credentials in staged changes with a local byte-level model.
+  entry: purebyte scan --staged --model secrets-code
+  language: system
+  pass_filenames: false
+  stages: [pre-commit]
+  minimum_pre_commit_version: "3.2.0"  # the stage name `pre-commit`

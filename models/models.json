@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "name": "secrets-code",
+      "version": "1.0.0",
+      "profile": "secrets-code",
+      "summary": "Finds credentials in source code, configuration and text files.",
+      "reads": "text files up to 4 MB (UTF-8 or UTF-16)",
+      "answers": "credential spans with line, column and byte offsets; masked snippets",
+      "card": "models/secrets-code.md",
+      "license": "MODEL_LICENSE.md",
+      "min_runtime": "1.0.0",
+      "files": [
+        {"role": "model", "file": "purebyte-secrets-code-1.0.0.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/secrets-code-1.0.0/purebyte-secrets-code-1.0.0.gguf", "sha256": "5f12adf8554bc22e9894dd749c27937d17eaba16cd398ac9dce2257f9e381c5e", "size": 1028704}
+      ]
+    },
+    {
+      "name": "secrets-code-ensemble",
+      "version": "1.0.0",
+      "profile": "secrets-code",
+      "summary": "Optional: secrets-code plus two independently trained models; a finding needs two of the three votes.",
+      "reads": "text files up to 4 MB (UTF-8 or UTF-16)",
+      "answers": "credential spans with line, column and byte offsets; masked snippets; the votes of each finding",
+      "card": "models/secrets-code.md",
+      "license": "MODEL_LICENSE.md",
+      "min_runtime": "1.0.0",
+      "files": [
+        {"role": "model", "file": "purebyte-secrets-code-1.0.0.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/secrets-code-1.0.0/purebyte-secrets-code-1.0.0.gguf", "sha256": "5f12adf8554bc22e9894dd749c27937d17eaba16cd398ac9dce2257f9e381c5e", "size": 1028704},
+        {"role": "ensemble", "file": "purebyte-secrets-code-1.0.0-e1.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/secrets-code-1.0.0/purebyte-secrets-code-1.0.0-e1.gguf", "sha256": "df72bf0796a580d020a4fa57ea5a9315a07adece44c122b5fcd0cd717753bba1", "size": 1028704},
+        {"role": "ensemble", "file": "purebyte-secrets-code-1.0.0-e2.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/secrets-code-1.0.0/purebyte-secrets-code-1.0.0-e2.gguf", "sha256": "03422c5ff93683ae9542028f5f742a7e70a5b0ad3ab17271107fbb808d6566ca", "size": 1028704}
+      ]
+    },
+    {
+      "name": "secrets-bin",
+      "version": "1.0.0",
+      "profile": "secrets-binary",
+      "summary": "Finds credentials inside binary files: executables, libraries, bytecode, WebAssembly, firmware.",
+      "reads": "any file up to 64 MiB",
+      "answers": "credential spans with byte offsets; the surrounding printable string, masked",
+      "card": "models/secrets-bin.md",
+      "license": "MODEL_LICENSE.md",
+      "min_runtime": "1.0.0",
+      "files": [
+        {"role": "model", "file": "purebyte-secrets-bin-1.0.0.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/secrets-bin-1.0.0/purebyte-secrets-bin-1.0.0.gguf", "sha256": "64f9e6c36f736b5b869de6737b19be987b48704f0c8a5c0d0e364db6e1463b13", "size": 30163488}
+      ]
+    },
+    {
+      "name": "pii",
+      "version": "1.0.0",
+      "profile": "redact",
+      "summary": "Finds personal data in any text and masks it as one type, PII, in a redacted copy.",
+      "reads": "any file up to 64 MiB: documents, e-mails, tickets, records, logs",
+      "answers": "spans of personal data (one type, PII) and a copy of the input with each one replaced by a marker such as [PII_1]",
+      "card": "models/pii.md",
+      "license": "MODEL_LICENSE.md",
+      "min_runtime": "1.0.0",
+      "files": [
+        {"role": "model", "file": "purebyte-pii-1.0.0.gguf", "url": "https://github.com/purebyte-ai/purebyte/releases/download/pii-1.0.0/purebyte-pii-1.0.0.gguf", "sha256": "da139fd046c1233fb9032082e45b4153bd89e0f50a001ccbc709a8311872e694", "size": 4764864}
+      ]
+    }
+  ]
+}

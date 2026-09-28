@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PureByte: scan the current file",
+      "type": "process",
+      "command": "purebyte",
+      "args": ["scan", "--model", "secrets-code", "${file}"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "PureByte: scan the staged changes",
+      "type": "process",
+      "command": "purebyte",
+      "args": ["scan", "--staged", "--model", "secrets-code"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "PureByte: scan the workspace (SARIF report)",
+      "type": "process",
+      "command": "purebyte",
+      "args": [
+        "scan", "--model", "secrets-code",
+        "--format", "sarif", "--out", "${workspaceFolder}/purebyte.sarif",
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "PureByte: start the local API",
+      "type": "process",
+      "command": "purebyte",
+      "args": ["serve", "--model", "secrets-code"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

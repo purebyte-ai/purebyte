@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use PureByte in your work, please cite it as below."
+title: "PureByte: an open runtime for tiny byte-level AI Specialists"
+type: software
+authors:
+  - family-names: "Sirvent Jiménez"
+    given-names: "Pablo"
+    email: "pablo@purebyte.ai"
+repository-code: "https://github.com/purebyte-ai/purebyte"
+license: Apache-2.0
+version: 1.0.0
+date-released: 2026-09-25
+abstract: >-
+  PureByte is an architecture and an open runtime for AI Specialists: tiny
+  models that read raw bytes and answer with decisions, scores and byte spans instead of
+  generated text. A model combines a byte embedding, an optional hashed n-gram memory,
+  ternary state-space blocks and task heads; the open runtime runs any model declared by a
+  single GGUF file on ordinary CPUs, offline, with bit-identical results across kernels
+  and thread counts on a platform. The training stack that builds, evaluates and exports new specialists
+  from pinned public data is a separate repository,
+  https://github.com/purebyte-ai/purebyte-train. Three example specialists detect
+  credentials in source code and in binary files, and mask personal data.
+keywords:
+  - byte-level models
+  - state-space models
+  - ternary weights
+  - small models
+  - CPU inference
+  - reproducible inference
+  - secret detection
+  - PII redaction

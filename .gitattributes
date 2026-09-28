@@ -1,0 +1,4 @@
+# Text files are stored and checked out with LF line endings on every platform: shell scripts and the shebang line of
+# the data scripts break with CRLF on Linux and macOS, and the formatting check compares bytes.
+* text=auto eol=lf
+*.gguf binary

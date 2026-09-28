@@ -1,0 +1,79 @@
+name: False positive or false negative
+description: A specialist flagged something harmless, or missed something it should have found.
+title: "[quality] "
+labels: ["model-quality", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are how the specialists get better. They must **never contain a real secret or real personal
+        data**, not even an expired or revoked one.
+
+        **How to make a look-alike:** keep the length, the character classes and any well-known prefix (for example
+        `ghp_`, `AKIA` or `sk_live_`), and replace everything else with random characters of the same kind.
+        Keep the context: the variable name, the file type and the neighboring lines matter more than the value.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - False positive (it flagged something that is not sensitive)
+        - False negative (it missed something sensitive)
+    validations:
+      required: true
+  - type: input
+    id: specialist
+    attributes:
+      label: Specialist and version
+      description: From `purebyte models list`.
+      placeholder: secrets-code 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PureByte version
+      description: From `purebyte version`.
+      placeholder: purebyte 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: filetype
+    attributes:
+      label: File type
+      description: The extension or format of the scanned file.
+      placeholder: .env, Python, YAML, PE executable, ...
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Masked snippet with context
+      description: |
+        Two or three lines around the value, with the value replaced by a look-alike. For binary files, describe
+        where the value is and paste the printable string around it with the value replaced.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: The finding as printed (false positives)
+      description: The finding from the JSON output, which is masked by default. Do not use the reveal option.
+      render: json
+  - type: textarea
+    id: expected
+    attributes:
+      label: Why it is wrong
+      description: For example "this is a public key token", "this is a test fixture" or "this is a live-looking password in a Go struct".
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: The snippet is a look-alike or masked, and contains no real credential and no real personal data.
+          required: true
+        - label: I checked that the problem still reproduces with the look-alike value.
+          required: false

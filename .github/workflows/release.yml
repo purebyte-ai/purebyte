@@ -1,0 +1,493 @@
+# Release: on a tag vX.Y.Z, build and test the runtime on every platform, then publish what docs/install.md promises:
+# the archives of the CLI with their SHA-256 files (a GitHub release whose notes are the tag's section of
+# CHANGELOG.md), the multi-architecture Docker image ghcr.io/purebyte-ai/purebyte (tags X.Y.Z and latest) and the
+# Python wheels on PyPI.
+#
+# Run by hand (workflow_dispatch), it is a dry run: everything is built and tested, the archives, wheels and release
+# notes are kept as artifacts of the run, and nothing is published. The procedure, how to verify a release and the
+# one-time settings (the `pypi` environment, trusted publishing) are in docs/releasing.md.
+#
+# Every job runs the whole test suite on what it ships before packaging it. Actions are pinned to full commit SHAs,
+# each job gets only the permissions it needs, and no job stores or prints a secret: PyPI is reached through trusted
+# publishing (OIDC), GitHub and ghcr.io through the job's own GITHUB_TOKEN.
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  NUMPY_VERSION: "2.2.1"  # the comparison with the reference implementation, as the training stack pins it
+
+jobs:
+  # The version (CMakeLists.txt, python/pyproject.toml and python/purebyte/__init__.py agree, and match the tag), the
+  # release notes, and whether this run publishes: only a tag pushed to the canonical repository does.
+  version:
+    name: version and notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+      latest: ${{ steps.version.outputs.latest }}
+      image: ${{ steps.version.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the version and write the release notes
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version=$(python3 .github/scripts/release.py version --tag "$GITHUB_REF_NAME")
+            python3 .github/scripts/release.py notes "$version" > release-notes.md
+            if [ "$GITHUB_REPOSITORY" = purebyte-ai/purebyte ]; then publish=true; fi
+          else
+            version=$(python3 .github/scripts/release.py version)
+            python3 .github/scripts/release.py notes "$version" --or-unreleased > release-notes.md
+          fi
+          # "latest" (the GitHub release and the image tag) only for the highest vX.Y.Z, not for an older line's patch
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" --paginate --jq '.[].ref' |
+            python3 .github/scripts/release.py newest "$version")
+          {
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "latest=$latest"
+            echo "image=ghcr.io/${GITHUB_REPOSITORY,,}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## PureByte $version"
+            echo
+            echo "Publish: $publish (latest: $latest). Release notes:"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  # The CLI of each platform with the C and C++ runtimes inside (PUREBYTE_STATIC_RUNTIME; fully static on Linux),
+  # built with the project's own compiler flags, tested, packaged as docs/install.md names it and checked the way users
+  # install it. On macOS and Windows the wheel is made from the same tested build.
+  binaries:
+    name: binary (${{ matrix.target }})
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x86_64, runner: ubuntu-24.04 }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+          - { target: macos-arm64, runner: macos-15, wheel-platform: macosx-11.0-arm64 }
+          - { target: macos-x86_64, runner: macos-15-intel, wheel-platform: macosx-11.0-x86_64 }
+          - { target: windows-x86_64, runner: windows-2022 }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install NumPy
+        run: python -m pip install "numpy==$NUMPY_VERSION"
+      - name: Configure
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cmake -S . -B build -A x64 -DPUREBYTE_STATIC_RUNTIME=ON
+          else
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPUREBYTE_STATIC_RUNTIME=ON
+          fi
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Package
+        run: |
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          python .github/scripts/release.py package --build build --target "$TARGET" --version "$VERSION" --out dist
+      - name: Verify and unpack as docs/install.md says (Linux, macOS)
+        if: runner.os != 'Windows'
+        working-directory: dist
+        run: |
+          asset="purebyte-$VERSION-$TARGET.tar.gz"
+          if [ "$RUNNER_OS" = macOS ]; then shasum -a 256 -c "$asset.sha256"; else sha256sum -c "$asset.sha256"; fi
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar -xzf "$asset" -C "$RUNNER_TEMP/unpacked"
+          said=$("$RUNNER_TEMP/unpacked/purebyte" version)
+          echo "$said"
+          if [ "$said" != "purebyte $VERSION" ]; then
+            echo "::error::the unpacked binary prints '$said', expected 'purebyte $VERSION'"
+            exit 1
+          fi
+      - name: Verify and unpack as docs/install.md says (Windows)
+        if: runner.os == 'Windows'
+        working-directory: dist
+        shell: pwsh
+        run: |
+          $asset = "purebyte-$env:VERSION-windows-x86_64.zip"
+          if ((Get-FileHash $asset -Algorithm SHA256).Hash.ToLower() -ne (Get-Content "$asset.sha256").Split(" ")[0]) {
+            throw "the SHA-256 of $asset does not match $asset.sha256"
+          }
+          Expand-Archive $asset -DestinationPath "$env:RUNNER_TEMP\unpacked"
+          $said = & "$env:RUNNER_TEMP\unpacked\purebyte.exe" version
+          $said
+          if ($said -ne "purebyte $env:VERSION") {
+            throw "the unpacked binary prints '$said', expected 'purebyte $env:VERSION'"
+          }
+      - name: Build the wheel from this build
+        if: runner.os != 'Linux'
+        env:
+          PUREBYTE_PREBUILT: ${{ github.workspace }}/build
+          WHEEL_PLATFORM: ${{ matrix.wheel-platform }}
+        run: |
+          # macOS: tag the wheel for the binaries' minimum system (CMakeLists.txt), not for the Python that builds it
+          if [ -n "$WHEEL_PLATFORM" ]; then
+            export _PYTHON_HOST_PLATFORM="$WHEEL_PLATFORM" MACOSX_DEPLOYMENT_TARGET=11.0
+          fi
+          python -m pip wheel --no-deps --wheel-dir wheelhouse ./python
+      - name: Test the wheel in a new virtual environment
+        if: runner.os != 'Linux'
+        run: python .github/scripts/release.py test-wheel wheelhouse/purebyte-"$VERSION"-py3-none-*.whl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os != 'Linux'
+        with:
+          name: wheel-${{ matrix.target }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  # Linux wheels are built in the manylinux_2_28 image (glibc 2.28 or newer), where the test suite runs first on the
+  # exact library and CLI that go into the wheel (a dynamic build: auditwheel checks it and sets the manylinux tag).
+  wheels-linux:
+    name: wheel (${{ matrix.target }})
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x86_64, runner: ubuntu-24.04 }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, test and repair the wheel
+        uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
+        with:
+          package-dir: python
+          output-dir: wheelhouse
+        env:
+          CIBW_BUILD: cp312-manylinux_*  # the wheel is py3-none: one build serves every Python 3.8 or newer
+          CIBW_ARCHS_LINUX: native
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+          CIBW_ENVIRONMENT_PASS_LINUX: NUMPY_VERSION
+          CIBW_ENVIRONMENT_LINUX: PUREBYTE_PREBUILT=/tmp/purebyte-native
+          CIBW_BEFORE_BUILD_LINUX: >-
+            cmake -S {project} -B /tmp/purebyte-native -DCMAKE_BUILD_TYPE=Release
+            -DPython3_EXECUTABLE="$(command -v python)" &&
+            cmake --build /tmp/purebyte-native --parallel &&
+            python -m pip install "numpy==$NUMPY_VERSION" &&
+            ctest --test-dir /tmp/purebyte-native --output-on-failure
+          CIBW_TEST_COMMAND: python {project}/.github/scripts/release.py test-wheel {wheel}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheel-${{ matrix.target }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  # The image of integrations/docker/Dockerfile (its build runs the test suite), built natively on each architecture
+  # and smoke-tested; when publishing, pushed by digest. The tags are set in docker-publish, after every check.
+  docker:
+    name: docker (${{ matrix.arch }})
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write  # push the untagged per-architecture images to ghcr.io when publishing
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build and test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: integrations/docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          load: true
+          tags: purebyte:candidate
+      - name: Smoke test
+        run: |
+          said=$(docker run --rm purebyte:candidate version)
+          echo "$said"
+          if [ "$said" != "purebyte $VERSION" ]; then
+            echo "::error::the image prints '$said', expected 'purebyte $VERSION'"
+            exit 1
+          fi
+          # integrations/gitlab-ci runs a shell script in the image, with git and curl
+          docker run --rm --entrypoint sh purebyte:candidate -c 'git --version && curl --version | head -n 1'
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: needs.version.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push by digest
+        id: push
+        if: needs.version.outputs.publish == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: integrations/docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          outputs: type=image,name=${{ needs.version.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+      # The push is a second build (its own run of the test suite, or the cache of the first): the image that was pushed
+      # is the one smoke-tested again, pulled by its digest. Untagged until docker-publish, after every other check.
+      - name: Smoke test the pushed image
+        if: needs.version.outputs.publish == 'true'
+        env:
+          IMAGE: ${{ needs.version.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          said=$(docker run --rm "$IMAGE@$DIGEST" version)
+          echo "$said"
+          if [ "$said" != "purebyte $VERSION" ]; then
+            echo "::error::the pushed image prints '$said', expected 'purebyte $VERSION'"
+            exit 1
+          fi
+          docker run --rm --entrypoint sh "$IMAGE@$DIGEST" -c 'git --version && curl --version | head -n 1'
+      - name: Keep the digest
+        if: needs.version.outputs.publish == 'true'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.version.outputs.publish == 'true'
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+
+  # The specialists of the catalog built into the release CLI can be pulled and verified from their releases, and the
+  # installation check of docs/install.md gives its finding. On a tag this gates publishing, so publish the model
+  # releases first (docs/releasing.md); in a dry run a failure is only reported.
+  models:
+    name: models pull (end to end)
+    needs: [version, binaries]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: ${{ github.event_name != 'push' }}
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: binary-linux-x86_64
+          path: ${{ runner.temp }}/dist
+      - name: Pull, verify and scan with the release binary
+        run: |
+          cd "$RUNNER_TEMP/dist"
+          sha256sum -c "purebyte-$VERSION-linux-x86_64.tar.gz.sha256"
+          tar -xzf "purebyte-$VERSION-linux-x86_64.tar.gz"
+          export PATH="$RUNNER_TEMP/dist:$PATH" PUREBYTE_HOME="$RUNNER_TEMP/models"
+          cd "$GITHUB_WORKSPACE"
+          for specialist in $(python3 .github/scripts/release.py published); do
+            purebyte models pull "$specialist"
+          done
+          purebyte models verify
+          purebyte models list
+          # docs/install.md, "Check the installation": a made-up password, one finding, exit status 1
+          status=0
+          printf 'password = "%s%s"\n' 'Tr0ub4dor' '&3xyz' | purebyte scan - || status=$?
+          if [ "$status" -ne 1 ]; then
+            echo "::error::the installation check of docs/install.md exits with $status, expected 1 (one finding)"
+            exit 1
+          fi
+
+  docker-publish:
+    name: publish the Docker image
+    needs: [version, binaries, wheels-linux, docker, models]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      packages: write  # tag the multi-architecture image on ghcr.io
+    env:
+      IMAGE: ${{ needs.version.outputs.image }}
+      VERSION: ${{ needs.version.outputs.version }}
+      LATEST: ${{ needs.version.outputs.latest }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag the multi-architecture image
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+          if [ "${#sources[@]}" -ne 2 ]; then
+            echo "::error::expected the digests of 2 images (amd64, arm64), found ${#sources[@]}"
+            exit 1
+          fi
+          tags=(--tag "$IMAGE:$VERSION")
+          if [ "$LATEST" = true ]; then tags+=(--tag "$IMAGE:latest"); fi
+          description="PureByte runtime: the purebyte CLI, no model (models are pulled at run time)"
+          docker buildx imagetools create "${tags[@]}" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "index:org.opencontainers.image.description=$description" \
+            --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+            --annotation "index:org.opencontainers.image.version=$VERSION" \
+            --annotation "index:org.opencontainers.image.revision=$GITHUB_SHA" \
+            "${sources[@]}"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+
+  pypi:
+    name: publish to PyPI
+    needs: [version, binaries, wheels-linux, docker, models]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/project/purebyte/${{ needs.version.outputs.version }}/
+    permissions:
+      id-token: write  # trusted publishing: PyPI trusts this workflow and environment, no token is stored anywhere
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: wheel-*
+          merge-multiple: true
+          path: dist
+      - name: Check the wheels
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ls -l dist
+          wheels=$(find dist -maxdepth 1 -name "purebyte-$VERSION-py3-none-*.whl" | wc -l)
+          files=$(find dist -mindepth 1 | wc -l)
+          if [ "$wheels" -ne 5 ] || [ "$files" -ne 5 ]; then
+            echo "::error::expected the 5 wheels of $VERSION (Linux and macOS x86-64 and arm64, Windows x86-64), only"
+            exit 1
+          fi
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: true  # a re-run after a partial upload sends only the missing wheels
+
+  # Last, so that the release page (and `version: latest` of the GitHub Action) appears when everything is out. The
+  # archives get a build provenance attestation, signed through Sigstore with this workflow's identity, which the
+  # GitHub Action verifies (`gh attestation verify`) besides their checksums: a .sha256 next to an archive only
+  # detects corruption, since whoever could replace the one could replace the other.
+  github-release:
+    name: publish the GitHub release
+    needs: [version, binaries, docker-publish, pypi]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write  # create the release and upload its assets; this job runs no code from the repository
+      id-token: write  # sign the attestation (a short-lived Sigstore certificate for this workflow)
+      attestations: write  # store the attestation with the repository
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      LATEST: ${{ needs.version.outputs.latest }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-notes
+          path: notes
+      - name: Verify the checksums
+        working-directory: dist
+        run: |
+          ls -l
+          sha256sum -c ./*.sha256
+          files=$(find . -mindepth 1 | wc -l)
+          if [ "$files" -ne 10 ]; then
+            echo "::error::expected 5 archives and their 5 .sha256 files, found $files files"
+            exit 1
+          fi
+      - name: Attest the provenance of the archives
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # With assets, gh creates a draft, uploads them, then publishes (and deletes the draft if an upload fails).
+          gh release create "$TAG" dist/* --verify-tag --title "PureByte $VERSION" \
+            --notes-file notes/release-notes.md --latest="$LATEST"

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/purebyte-ai/purebyte/security/advisories/new
+    about: Please report vulnerabilities privately, never as public issues.
+  - name: Questions and ideas
+    url: https://github.com/purebyte-ai/purebyte/discussions
+    about: Ask questions and share ideas in GitHub Discussions.

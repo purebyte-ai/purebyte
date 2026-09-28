@@ -1,0 +1,2 @@
+# The public C header keeps its hand-aligned C layout (`char *p`, aligned comments).
+DisableFormat: true

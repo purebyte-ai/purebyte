@@ -1,0 +1,163 @@
+# Build and test on Linux, macOS and Windows, and check the C++ formatting and the release version. Releases have their
+# own workflow, release.yml (docs/releasing.md). The training stack is tested in its own repository, purebyte-train.
+#
+# Every build job runs the whole ctest suite (tests/README.md): the C++ unit tests, the random models generated from
+# the specification against the NumPy reference and the golden files, kernel and thread invariance, the refusal of
+# malformed model files, and the CLI and Python bindings end to end. On macOS arm64 the NEON kernel is compared with
+# the scalar kernel bit for bit natively.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Check the formatting of every C++ file (clang-format 17, .clang-format)
+        run: |
+          pip install clang-format==17.0.6
+          git ls-files '*.cpp' '*.h' ':!:*/third_party/*' | xargs clang-format --dry-run --Werror
+
+  # The release helpers of .github/scripts/release.py on every change (docs/releasing.md): the version stated by
+  # CMakeLists.txt, python/pyproject.toml and python/purebyte/__init__.py agrees, and the model catalog is readable.
+  release-check:
+    name: release check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Version and catalog
+        run: |
+          python3 .github/scripts/release.py version
+          python3 .github/scripts/release.py published
+
+  unix:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-gcc, os: ubuntu-24.04, cxx: g++ }
+          - { name: linux-clang, os: ubuntu-24.04, cxx: clang++ }
+          - { name: macos-arm64, os: macos-15, cxx: clang++ }
+          - { name: macos-universal, os: macos-15, cxx: clang++, archs: "arm64;x86_64" }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Configure
+        env:
+          CXX: ${{ matrix.cxx }}
+          ARCHS: ${{ matrix.archs }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$ARCHS"
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Test the x86_64 slice under Rosetta
+        if: matrix.archs != ''
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            PUREBYTE_TEST_MODELS=build/tests/work/models arch -x86_64 build/tests/purebyte_tests
+          else
+            echo "Rosetta is not available: the x86_64 slice was built, not run"
+          fi
+
+  windows-msvc:
+    name: windows-msvc
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+  windows-mingw:
+    name: windows-mingw
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-numpy
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # The Python package on the oldest Python it supports (python/pyproject.toml, requires-python), against the library
+  # and the CLI of this build. The other jobs test it on Python 3.12.
+  python-oldest:
+    name: python 3.8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.8"
+      - name: Build the library and the CLI
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPUREBYTE_BUILD_TESTS=OFF
+          cmake --build build --parallel
+      - name: Test the package
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          export PUREBYTE_LIBRARY="$PWD/build/libpurebyte.so" PUREBYTE_CLI="$PWD/build/cli/purebyte"
+          python --version
+          python -m unittest discover -s python/tests

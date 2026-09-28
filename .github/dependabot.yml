@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Actions used by the workflows and by the composite GitHub Action that users run.
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/integrations/github-action"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  # Base images of the Docker image.
+  - package-ecosystem: docker
+    directory: "/integrations/docker"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "docker"
+
+  # Build and test tooling of the Python package (the package itself has no runtime dependencies).
+  - package-ecosystem: pip
+    directory: "/python"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "python"

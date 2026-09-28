@@ -1,0 +1,52 @@
+name: Feature request
+description: Propose an improvement to the runtime, a new integration or a new input format.
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Training, recipes, data scripts or a new specialist?** Those requests go to the training repository:
+        [github.com/purebyte-ai/purebyte-train/issues](https://github.com/purebyte-ai/purebyte-train/issues).
+
+        Thanks for the idea. The most useful requests start from a concrete problem and say how you would know it is solved.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Engine or model format
+        - CLI
+        - HTTP API
+        - Python package
+        - Integrations (CI, pre-commit, Docker, editors)
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposal
+      description: What should PureByte do? Commands, options or output examples help.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you use today, or other tools that solve it.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this myself (see CONTRIBUTING.md and AGENTS.md).
+          required: false

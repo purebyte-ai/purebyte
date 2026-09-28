@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in the runtime, the CLI, the HTTP API, the Python package or an integration does not work as documented.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug.
+
+        **Never paste real credentials or real personal data** in this form: replace them with look-alike values.
+        Security vulnerabilities must be reported privately instead, as described in `SECURITY.md`.
+        If a specialist flagged something harmless or missed a secret, use the "False positive or false negative" form.
+  - type: input
+    id: version
+    attributes:
+      label: PureByte version
+      description: The output of `purebyte version`.
+      placeholder: purebyte 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: models
+    attributes:
+      label: Specialists involved
+      description: The output of `purebyte models list`, if a model is involved.
+      placeholder: secrets-code 1.0.0
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux x86-64
+        - Linux arm64
+        - macOS arm64
+        - macOS x86-64
+        - Windows x86-64
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How PureByte was installed or run
+      options:
+        - Release binary
+        - pip
+        - Docker image
+        - Built from source
+        - GitHub Action
+        - pre-commit hook
+        - GitLab CI template
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command or request you ran, and what you saw. Paste output as text, not as a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: A minimal input or command sequence helps most. Replace every sensitive value with a look-alike.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: This report contains no real credentials and no real personal data.
+          required: true
+        - label: I searched the existing issues for the same problem.
+          required: false

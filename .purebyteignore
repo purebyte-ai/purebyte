@@ -1,0 +1,4 @@
+# Paths that `purebyte scan` leaves out when it scans this repository (docs/cli.md#ignoring-findings).
+
+# Third-party code, vendored as it is.
+cli/third_party/

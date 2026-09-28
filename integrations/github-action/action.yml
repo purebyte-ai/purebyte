@@ -1,0 +1,117 @@
+name: PureByte scan
+description: Find credentials in code and binaries with local byte-level models, and upload the results to GitHub code scanning.
+author: The PureByte authors
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  model:
+    description: Specialist to run, such as `secrets-code` or `secrets-bin`. Use one step per specialist.
+    default: secrets-code
+  version:
+    description: >-
+      Version of the purebyte CLI to install, such as `1.0.0`. Empty (the default) installs the version of the release
+      the action is pinned to (`@v1.0.0` installs 1.0.0), so that pinning the action pins the CLI and its model
+      catalog; `latest` follows the newest release.
+    default: ""
+  verify-provenance:
+    description: >-
+      Verify the build provenance attestation of the downloaded archive with `gh attestation verify` (the GitHub CLI,
+      present on GitHub-hosted runners), besides its SHA-256 checksum.
+    default: "true"
+  path:
+    description: Directory to scan.
+    default: .
+  scope:
+    description: >-
+      `changed` scans what the pull request or push changes and reports findings on added lines (everything under
+      `path` when there is nothing to compare with). `all` always scans everything under `path`.
+    default: changed
+  sarif-file:
+    description: Where to write the SARIF report.
+    default: purebyte.sarif
+  upload-sarif:
+    description: "Upload the SARIF report to GitHub code scanning (the job needs `security-events: write`)."
+    default: "true"
+  fail-on-findings:
+    description: >-
+      Fail the step when there is at least one finding of severity `error`. Findings in test, example and
+      documentation paths are warnings: reported and uploaded, but they do not fail the step unless `strict` is true.
+    default: "true"
+  strict:
+    description: Fail on warnings too (findings in test, example and documentation paths), as `purebyte scan --strict`.
+    default: "false"
+  args:
+    description: Extra arguments for `purebyte scan`.
+    default: ""
+  github-token:
+    description: "Token used to download the release, verify its attestation and, with `version: latest`, find it."
+    default: ${{ github.token }}
+
+outputs:
+  findings:
+    description: Number of findings, of both severities.
+    value: ${{ steps.scan.outputs.findings }}
+  errors:
+    description: Number of findings of severity error (these fail the step).
+    value: ${{ steps.scan.outputs.errors }}
+  warnings:
+    description: Number of warnings (findings in test, example and documentation paths).
+    value: ${{ steps.scan.outputs.warnings }}
+  sarif-file:
+    description: Path of the SARIF report.
+    value: ${{ steps.scan.outputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install PureByte
+      shell: bash
+      env:
+        PUREBYTE_VERSION: ${{ inputs.version }}
+        PUREBYTE_REPO: ${{ github.action_repository }}
+        PUREBYTE_VERIFY_PROVENANCE: ${{ inputs.verify-provenance }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: bash "$GITHUB_ACTION_PATH/install.sh"
+
+    - name: Pull the model
+      shell: bash
+      env:
+        PUREBYTE_MODEL: ${{ inputs.model }}
+      run: purebyte models pull "$PUREBYTE_MODEL"
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        PUREBYTE_MODEL: ${{ inputs.model }}
+        PUREBYTE_PATH: ${{ inputs.path }}
+        PUREBYTE_SCOPE: ${{ inputs.scope }}
+        PUREBYTE_SARIF: ${{ inputs.sarif-file }}
+        PUREBYTE_STRICT: ${{ inputs.strict }}
+        PUREBYTE_ARGS: ${{ inputs.args }}
+        PUREBYTE_UPLOAD: ${{ inputs.upload-sarif }}
+        PUSH_BEFORE_SHA: ${{ github.event.before }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+      run: bash "$GITHUB_ACTION_PATH/scan.sh"
+
+    # Pull requests from forks get a read-only token, which cannot upload: the upload is skipped for them.
+    - name: Upload to code scanning
+      if: ${{ always() && inputs.upload-sarif == 'true' && steps.scan.outputs.sarif-file != '' && github.event.pull_request.head.repo.fork != true }}
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: purebyte-${{ inputs.model }}
+
+    # `failing` is the CLI's own verdict (exit status 1): an error, or a warning with --strict.
+    - name: Fail on findings
+      if: ${{ inputs.fail-on-findings == 'true' && steps.scan.outputs.failing == 'true' }}
+      shell: bash
+      env:
+        ERRORS: ${{ steps.scan.outputs.errors }}
+        WARNINGS: ${{ steps.scan.outputs.warnings }}
+      run: |
+        echo "::error title=PureByte::${ERRORS} possible credential(s) found, plus ${WARNINGS} warning(s) in test, example or documentation paths. See the code scanning alerts or the log of the scan step."
+        exit 1

@@ -1,0 +1,6 @@
+# Build context rules for integrations/docker/Dockerfile (BuildKit reads <Dockerfile>.dockerignore next to it).
+.git
+**/build
+**/build-*
+**/__pycache__
+**/*.gguf

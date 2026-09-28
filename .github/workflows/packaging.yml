@@ -1,0 +1,67 @@
+# The Docker image and the Python wheel, built and tested on the pull requests that change how they are made, so that
+# a break shows before a release. The release workflow (release.yml) builds them again for every platform.
+name: packaging
+
+on:
+  pull_request:
+    paths:
+      - "integrations/docker/**"
+      - "python/**"
+      - "CMakeLists.txt"
+      - "cli/CMakeLists.txt"
+      - ".github/scripts/release.py"
+      - ".github/workflows/packaging.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The image of integrations/docker/Dockerfile (its build runs the test suite), then the checks of the release job.
+  docker:
+    name: docker image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build and test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: integrations/docker/Dockerfile
+          load: true
+          tags: purebyte:pull-request
+      - name: Smoke test
+        run: |
+          docker run --rm purebyte:pull-request version
+          docker run --rm --entrypoint sh purebyte:pull-request -c 'git --version && curl --version | head -n 1'
+
+  # The wheel as python/setup.py makes it from a build, installed and tested in a new virtual environment.
+  wheel:
+    name: python wheel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPUREBYTE_BUILD_TESTS=OFF
+          cmake --build build --parallel
+      - name: Make the wheel
+        env:
+          PUREBYTE_PREBUILT: ${{ github.workspace }}/build
+        run: python -m pip wheel --no-deps --wheel-dir wheelhouse ./python
+      - name: Test the wheel in a new virtual environment
+        run: python .github/scripts/release.py test-wheel wheelhouse/purebyte-*-py3-none-*.whl

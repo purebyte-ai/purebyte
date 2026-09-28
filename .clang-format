@@ -1,0 +1,16 @@
+# The C++ style of the repository (clang-format 17). CI checks every C++ file except third_party/.
+#   clang-format -i $(git ls-files '*.cpp' '*.h' ':!:*/third_party/*')
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+BreakStringLiterals: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2
+IncludeBlocks: Preserve

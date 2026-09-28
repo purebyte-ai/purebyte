@@ -1,0 +1,73 @@
+# PureByte secrets scan for GitLab CI. Documentation: integrations/gitlab-ci/README.md in the PureByte repository.
+#
+# Use it from your .gitlab-ci.yml:
+#
+#   include:
+#     - remote: "https://raw.githubusercontent.com/purebyte-ai/purebyte/v1.0.0/integrations/gitlab-ci/purebyte.gitlab-ci.yml"
+#
+# With PUREBYTE_SCOPE=changed (the default) it scans, in merge request pipelines, the changes against the target
+# branch and reports findings on added lines; in branch pipelines, the changes of the push; otherwise everything under
+# PUREBYTE_PATH. Nothing leaves the runner.
+
+variables:
+  PUREBYTE_IMAGE: "ghcr.io/purebyte-ai/purebyte:1.0.0"
+  PUREBYTE_MODEL: "secrets-code"
+  PUREBYTE_PATH: "."
+  PUREBYTE_SCOPE: "changed"
+  PUREBYTE_ARGS: ""
+  PUREBYTE_FAIL_ON_FINDINGS: "true"
+
+purebyte:
+  stage: test
+  image:
+    name: "$PUREBYTE_IMAGE"
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"                              # comparing with the target branch needs its history
+    PUREBYTE_HOME: "$CI_PROJECT_DIR/.purebyte"  # model cache, kept between pipelines
+  cache:
+    key: "purebyte-$PUREBYTE_MODEL"
+    paths:
+      - .purebyte/
+  script:
+    # git trusts the configuration of this checkout only (the image trusts /src, where `docker run` mounts a project)
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - purebyte models pull "$PUREBYTE_MODEL"
+    - |
+      base=""
+      if [ "$PUREBYTE_SCOPE" = "changed" ]; then
+        if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+          base="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+          base="$CI_COMMIT_BEFORE_SHA"
+        fi
+      fi
+      # PUREBYTE_ARGS is split into words, never expanded as file patterns (`--exclude *.min.js` stays a pattern);
+      # the model cache in .purebyte/ is never scanned.
+      set -f
+      status=0
+      if [ -n "$base" ]; then
+        echo "Scanning the changes since $base with $PUREBYTE_MODEL"
+        purebyte scan --model "$PUREBYTE_MODEL" --git-diff "$base" --format sarif --out purebyte.sarif --exclude /.purebyte/ $PUREBYTE_ARGS "$PUREBYTE_PATH" || status=$?
+      else
+        echo "Scanning $PUREBYTE_PATH with $PUREBYTE_MODEL"
+        purebyte scan --model "$PUREBYTE_MODEL" --format sarif --out purebyte.sarif --exclude /.purebyte/ $PUREBYTE_ARGS "$PUREBYTE_PATH" || status=$?
+      fi
+      set +f
+      # 0 = no error (warnings in test, example and documentation paths do not count unless --strict is in
+      # PUREBYTE_ARGS), 1 = findings of severity error, anything else = the scan could not complete
+      if [ "$status" -gt 1 ]; then exit "$status"; fi
+      if [ "$status" -eq 1 ] && [ "$PUREBYTE_FAIL_ON_FINDINGS" = "true" ]; then
+        echo "PureByte found possible credentials: see the job log and the purebyte.sarif artifact."
+        exit 1
+      fi
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - purebyte.sarif
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH

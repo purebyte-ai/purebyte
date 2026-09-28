@@ -1,0 +1,60 @@
+# Build trees (keep them outside the source tree or under build/)
+build/
+build-*/
+out/
+cmake-build-*/
+.vs/
+CMakeUserPresets.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# the native library, CLI, catalog and license that a wheel build copies into the package (python/setup.py)
+python/purebyte/_lib/
+python/purebyte/_data/
+python/LICENSE
+
+# Weights, checkpoints and data never enter git: released weights are published separately (models/README.md), test
+# models are generated, and data, runs and exports live in $PUREBYTE_DATA and $PUREBYTE_WORK (default ~/.purebyte).
+# The names below catch those directories and files if they are ever pointed inside the working tree.
+*.gguf
+*.gguf.sha256
+*.part
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.npz
+*.npy
+.purebyte/
+PUREBYTE_DATA/
+PUREBYTE_WORK/
+purebyte-data/
+purebyte-work/
+purebyte-models/
+
+# Reports and redaction maps can hold findings or values (a map holds the originals): keep them out of git
+*.sarif
+purebyte-report*.json
+*.map.json
+
+# Local settings and credentials
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
