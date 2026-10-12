@@ -11,7 +11,7 @@
 # proposes new digests (.github/dependabot.yml).
 
 # ---------------------------------------------------------------------------------------------------------- build
-FROM debian:bookworm@sha256:f37a335e82bca302e955fa39f9dfe28f1be618f016f8a2b56318e5a5111afc26 AS build
+FROM debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858 AS build
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates cmake g++ make python3 \
@@ -27,7 +27,7 @@ RUN cmake -S . -B /build -DCMAKE_BUILD_TYPE=Release \
  && install -D -m 0755 "$(find /build -type f -name purebyte -perm -u+x | head -n 1)" /out/purebyte
 
 # -------------------------------------------------------------------------------------------------------- runtime
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 
 LABEL org.opencontainers.image.title="PureByte" \
       org.opencontainers.image.description="Open runtime for tiny byte-level AI models. Models are pulled at run time." \
